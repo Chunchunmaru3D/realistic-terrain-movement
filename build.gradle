@@ -1,0 +1,70 @@
+plugins {
+    id 'java'
+    id 'net.neoforged.moddev' version '1.0.21'
+}
+
+version = '1.0.0'
+group = 'com.realisticterrainmovement'
+
+base {
+    archivesName = 'realistic-terrain-movement'
+}
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(21)
+}
+
+neoForge {
+    version = '21.1.172'
+
+    parchment {
+        mappingsVersion = '2024.11.17'
+        minecraftVersion = '1.21.1'
+    }
+
+    runs {
+        client {
+            client()
+            systemProperty 'neoforge.enabledGameTestNamespaces', 'realisticterrainmovement'
+        }
+        server {
+            server()
+            programArgument '--nogui'
+            systemProperty 'neoforge.enabledGameTestNamespaces', 'realisticterrainmovement'
+        }
+    }
+
+    mods {
+        realisticterrainmovement {
+            sourceSet sourceSets.main
+        }
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+}
+
+tasks.withType(ProcessResources).configureEach {
+    var replaceProperties = [
+            minecraft_version      : '1.21.1',
+            minecraft_version_range: '[1.21.1,1.22)',
+            neo_version            : '21.1.172',
+            neo_version_range      : '[21.1,)',
+            loader_version_range   : '[4,)',
+            mod_id                 : 'realisticterrainmovement',
+            mod_name               : 'Realistic Terrain Movement',
+            mod_license            : 'MIT',
+            mod_version            : project.version,
+            mod_authors            : 'Chunchunmaru3D',
+            mod_description        : 'Realistic terrain, wind and boat mechanics.'
+    ]
+    inputs.properties replaceProperties
+
+    filesMatching(['META-INF/neoforge.mods.toml']) {
+        expand replaceProperties
+    }
+}
