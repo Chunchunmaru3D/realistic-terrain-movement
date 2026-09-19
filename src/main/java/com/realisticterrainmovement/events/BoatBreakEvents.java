@@ -11,6 +11,7 @@ import net.minecraft.world.entity.vehicle.Boat;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.event.config.ModConfigEvent;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.tick.EntityTickEvent;
 
@@ -34,13 +35,21 @@ import net.neoforged.neoforge.event.tick.EntityTickEvent;
  */
 public class BoatBreakEvents {
 
+    private final BoatBreakPolicy boatBreakPolicy = new BoatBreakPolicy();
+
+    public void onConfigChanged(ModConfigEvent event) {
+        if (event.getConfig().getSpec() == RealisticTerrainMovementConfig.SPEC) {
+            boatBreakPolicy.reloadFromConfig();
+        }
+    }
+
     @SubscribeEvent
     public void onBoatJoin(EntityJoinLevelEvent event) {
         if (!RealisticTerrainMovementConfig.BOATS_ENABLED.get()) return;
         if (!RealisticTerrainMovementConfig.BREAK_BOATS_IN_OCEAN.get()) return;
         if (event.getLevel().isClientSide()) return;
         if (event.loadedFromDisk()) return;
-        if (!(event.getEntity() instanceof Boat boat)) return;
+        if (!(event.getEntity() instanceof Boat boat) || !boatBreakPolicy.shouldBreak(boat)) return;
 
         Level level = (Level) event.getLevel();
         BlockPos pos = boat.blockPosition();
@@ -55,8 +64,8 @@ public class BoatBreakEvents {
     public void onBoatTick(EntityTickEvent.Post event) {
         if (!RealisticTerrainMovementConfig.BOATS_ENABLED.get()) return;
         if (!RealisticTerrainMovementConfig.BREAK_BOATS_IN_OCEAN.get()) return;
-        if (!(event.getEntity() instanceof Boat boat)) return;
-        if (boat.level().isClientSide()) return;
+        if (event.getEntity().level().isClientSide()) return;
+        if (!(event.getEntity() instanceof Boat boat) || !boatBreakPolicy.shouldBreak(boat)) return;
 
         Level level = (Level) boat.level();
         BlockPos pos = boat.blockPosition();

@@ -53,6 +53,8 @@ public class RealisticTerrainMovementConfig {
     // ── Boats ─────────────────────────────────────────────────────────────────
 
     public static final ModConfigSpec.ConfigValue<Boolean> BREAK_BOATS_IN_OCEAN;
+    public static final ModConfigSpec.ConfigValue<List<? extends String>> OCEAN_BOAT_WHITELIST;
+    public static final ModConfigSpec.ConfigValue<List<? extends String>> OCEAN_BOAT_BLACKLIST;
 
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -385,6 +387,20 @@ public class RealisticTerrainMovementConfig {
         BREAK_BOATS_IN_OCEAN = BUILDER
                 .comment("Whether boats break instantly when placed in water within ocean biomes (default: true). Also controlled by [features].boatsEnabled.")
                 .define("breakBoatsInOcean", true);
+        OCEAN_BOAT_WHITELIST = BUILDER
+                .comment(
+                        "Non-standard boat entity types or entity-type tags that should break in ocean biomes.",
+                        "Format: \"namespace:entity_type\" or \"#namespace:entity_type_tag\".",
+                        "Use this for custom boats that automatic vanilla-style boat detection skips."
+                )
+                .defineListAllowEmpty("oceanBoatWhitelist", List.of(), entry -> entry instanceof String s && !s.isBlank());
+        OCEAN_BOAT_BLACKLIST = BUILDER
+                .comment(
+                        "Boat entity types or entity-type tags that must never break in ocean biomes.",
+                        "Format: \"namespace:entity_type\" or \"#namespace:entity_type_tag\".",
+                        "This blacklist takes priority over the whitelist and automatic vanilla-style boat detection."
+                )
+                .defineListAllowEmpty("oceanBoatBlacklist", List.of(), entry -> entry instanceof String s && !s.isBlank());
         BUILDER.pop();
 
         SPEC = BUILDER.build();

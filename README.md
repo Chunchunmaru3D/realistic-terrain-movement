@@ -70,8 +70,10 @@ All the above applies to **every mob**, except:
   this can be enabled with `affectsMountedEntities`
 
 ### 6. Boats break in the open ocean
-Any boat in water within an **ocean biome** instantly breaks and **drops itself as a pickable item**
-(matching wood type). This includes boats that drift into an ocean and boats restored from a saved world.
+Standard-size boats in water within an **ocean biome** instantly break and **drop themselves as pickable items**
+(matching wood type). This includes vanilla boats and standard variants from modded wood types, while larger
+ships and non-standard water transport are left alone. Boats that drift into an ocean and boats restored from
+a saved world are checked too.
 
 ---
 
@@ -82,7 +84,7 @@ Any boat in water within an **ocean biome** instantly breaks and **drops itself 
 |---|---|---|
 | `terrainEnabled` | `true` | Block bonuses/penalties + boots reduction entirely |
 | `windEnabled` | `true` | High-altitude wind push and slowdown entirely |
-| `boatsEnabled` | `true` | Boat-breaking mechanic entirely |
+| `boatsEnabled` | `true` | Standard-boat breaking mechanic entirely |
 
 Turning a feature off here means **zero performance cost** for that mechanic — it's skipped
 before any other logic runs.
@@ -113,6 +115,8 @@ before any other logic runs.
 | | `windSoundEnabled` | `true` | Enable the independent client-side procedural wind sound |
 | | `windSoundMaxVolume` | `0.45` | Maximum volume; its height curve is 5%/30%/60%/100% at Y=90/120/180/250 |
 | `boats` | `breakBoatsInOcean` | `true` | Toggle (redundant with `features.boatsEnabled`, kept for fine control) |
+| | `oceanBoatWhitelist` | `[]` | Non-standard boats to break: entity IDs (`modid:boat`) or entity-type tags (`#modid:boats`) |
+| | `oceanBoatBlacklist` | `[]` | Protected boat entity IDs (`modid:boat`) or entity-type tags (`#modid:boats`) |
 
 All changes take effect live — no restart needed. `NORMAL` preserves the existing block modifier
 percentages; `EASY` and `HARDCORE` only scale the final penalty, so modpack authors can still edit
@@ -129,7 +133,7 @@ Requirements: **JDK 21**
 gradlew.bat build     # Windows
 ```
 
-Output: `build/libs/realistic-terrain-movement-1.1.0.jar` → drop into `mods/`.
+Output: `build/libs/realistic-terrain-movement-1.1.1.jar` → drop into `mods/`.
 
 ---
 
@@ -147,6 +151,17 @@ Output: `build/libs/realistic-terrain-movement-1.1.0.jar` → drop into `mods/`.
 - Config lists are cached and only re-parsed when the config actually changes.
 - Per-entity movement state is removed when an entity leaves the level, preventing long-running
   servers from retaining stale entries.
+- Ocean boat breaking automatically accepts only `Boat` entities with a vanilla-sized hull and a standard
+  `BoatItem` drop. The hull dimensions are taken from the current vanilla `EntityType.BOAT`, covering
+  common modded wood variants while protecting ships.
+- Use `oceanBoatWhitelist` to make a skipped custom boat break, or `oceanBoatBlacklist` to protect a
+  detected boat. Both accept `modid:boat_entity` or `#modid:boat_entities`; blacklist takes priority.
+  These lists apply only to entities derived from `Boat`.
+
+## Changelog (version 1.1.1)
+- Improved ocean boat detection: standard vanilla-style boats, including modded wood variants, now break correctly.
+- Large ships and other non-standard water transport are protected from ocean breaking by default.
+- Added `oceanBoatWhitelist` and `oceanBoatBlacklist` for custom `Boat` entities and entity-type tags; blacklist overrides whitelist.
 
 ## Changelog (version 1.1.0)
 - Added `EASY`, `NORMAL`, and `HARDCORE` terrain presets while keeping every block modifier configurable.

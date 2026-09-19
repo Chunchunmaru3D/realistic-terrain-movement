@@ -23,7 +23,9 @@ public class RealisticTerrainMovementMod {
 
         NeoForge.EVENT_BUS.register(new MovementModifierEvents());
         NeoForge.EVENT_BUS.register(new WindEvents());
-        NeoForge.EVENT_BUS.register(new BoatBreakEvents());
+        BoatBreakEvents boatBreakEvents = new BoatBreakEvents();
+        NeoForge.EVENT_BUS.register(boatBreakEvents);
+        modEventBus.addListener(boatBreakEvents::onConfigChanged);
 
         LOGGER.info("Realistic Terrain Movement mod loaded! Mechanics: terrain (sticky on jump), wind, boats.");
     }
