@@ -2,6 +2,7 @@ package com.realisticterrainmovement.events;
 
 import com.realisticterrainmovement.RealisticTerrainMovementMod;
 import com.realisticterrainmovement.config.RealisticTerrainMovementConfig;
+import com.realisticterrainmovement.config.TerrainDifficulty;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
@@ -18,6 +19,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.neoforge.event.entity.EntityLeaveLevelEvent;
 import net.neoforged.neoforge.event.tick.EntityTickEvent;
 
 import java.util.HashMap;
@@ -63,12 +65,20 @@ public class MovementModifierEvents {
     private final Map<UUID, Double> lastPenaltySum = new HashMap<>();
     /** Per-entity: was the entity on ground on the previous tick (used to detect the jump-off moment). */
     private final Map<UUID, Boolean> wasOnGround = new HashMap<>();
+    /** Per-entity: smoothed modifier currently applied to the movement attribute. */
+    private final Map<UUID, Double> currentTerrainValue = new HashMap<>();
+    /** Per-entity: target of the current terrain transition. */
+    private final Map<UUID, Double> terrainTransitionTarget = new HashMap<>();
+    /** Per-entity: ticks left before the current terrain transition reaches its target. */
+    private final Map<UUID, Integer> terrainTransitionTicksRemaining = new HashMap<>();
 
     @SubscribeEvent
     public void onEntityTick(EntityTickEvent.Post event) {
         if (!(event.getEntity() instanceof LivingEntity entity)) return;
         if (entity.level().isClientSide()) return;
+        UUID id = entity.getUUID();
         if (!RealisticTerrainMovementConfig.TERRAIN_ENABLED.get()) {
+            clearState(id);
             removeModifier(entity);
             return;
         }
@@ -79,11 +89,13 @@ public class MovementModifierEvents {
         rebuildExcludedCacheIfNeeded();
 
         if (!isPlayer && !RealisticTerrainMovementConfig.AFFECT_MOBS.get()) {
+            clearState(id);
             removeModifier(entity);
             return;
         }
 
         if (isExcluded(entity)) {
+            clearState(id);
             removeModifier(entity);
             return;
         }
@@ -91,18 +103,18 @@ public class MovementModifierEvents {
         if (isPlayer) {
             Player player = (Player) entity;
             if (player.getAbilities().flying && !RealisticTerrainMovementConfig.AFFECT_FLYING.get()) {
+                clearState(id);
                 removeModifier(entity);
                 return;
             }
         }
 
-        UUID id = entity.getUUID();
         boolean hasBoots = !entity.getItemBySlot(EquipmentSlot.FEET).isEmpty();
         boolean bootsReductionOn = RealisticTerrainMovementConfig.BOOTS_REDUCTION_ENABLED.get();
         double bootsFactor = (hasBoots && bootsReductionOn) ? RealisticTerrainMovementConfig.BOOTS_PENALTY_REDUCTION.get() : 1.0;
 
         boolean grounded = entity.onGround();
-        double terrainValue;
+        double targetTerrainValue;
 
         if (grounded) {
             // Grounded: compute fresh terrain value from the blocks at/below the entity.
@@ -118,28 +130,29 @@ public class MovementModifierEvents {
             if (feetValue > 0) bonusSum += feetValue; else penaltySum += -feetValue;
             if (belowValue > 0) bonusSum += belowValue; else penaltySum += -belowValue;
 
+            penaltySum *= getDifficultyPenaltyMultiplier();
             penaltySum *= bootsFactor;
 
             double netFraction = bonusSum - penaltySum;
             double multiplier = 1.0 + netFraction;
             multiplier = Math.max(0.1, Math.min(3.0, multiplier));
-            terrainValue = multiplier - 1.0;
+            targetTerrainValue = multiplier - 1.0;
 
-            lastTerrainValue.put(id, terrainValue);
+            lastTerrainValue.put(id, targetTerrainValue);
             lastPenaltySum.put(id, penaltySum);
             stickyTicksRemaining.put(id, RealisticTerrainMovementConfig.TERRAIN_STICKY_TICKS.get());
         } else {
             // Airborne: hold the last grounded value for the configured grace period, then decay to neutral.
             int remaining = stickyTicksRemaining.getOrDefault(id, 0);
             if (remaining > 0) {
-                terrainValue = lastTerrainValue.getOrDefault(id, 0.0);
+                targetTerrainValue = lastTerrainValue.getOrDefault(id, 0.0);
                 stickyTicksRemaining.put(id, remaining - 1);
             } else {
-                terrainValue = 0.0;
+                targetTerrainValue = 0.0;
             }
         }
 
-        applyModifier(entity, terrainValue);
+        applyModifier(entity, transitionTerrainValue(id, targetTerrainValue));
 
         // ── Jump distance limiting (horizontal only, never touches vertical jump height) ──
         if (RealisticTerrainMovementConfig.JUMP_DISTANCE_LIMIT_ENABLED.get()) {
@@ -158,6 +171,49 @@ public class MovementModifierEvents {
             }
         }
         wasOnGround.put(id, grounded);
+    }
+
+    @SubscribeEvent
+    public void onEntityLeaveLevel(EntityLeaveLevelEvent event) {
+        clearState(event.getEntity().getUUID());
+    }
+
+    private double getDifficultyPenaltyMultiplier() {
+        return switch (TerrainDifficulty.fromConfig(RealisticTerrainMovementConfig.TERRAIN_DIFFICULTY.get())) {
+            case EASY -> RealisticTerrainMovementConfig.EASY_TERRAIN_PENALTY_MULTIPLIER.get();
+            case NORMAL -> 1.0;
+            case HARDCORE -> RealisticTerrainMovementConfig.HARDCORE_TERRAIN_PENALTY_MULTIPLIER.get();
+        };
+    }
+
+    private double transitionTerrainValue(UUID id, double target) {
+        int transitionTicks = RealisticTerrainMovementConfig.TERRAIN_TRANSITION_TICKS.get();
+        if (transitionTicks == 0) {
+            currentTerrainValue.put(id, target);
+            terrainTransitionTarget.put(id, target);
+            terrainTransitionTicksRemaining.put(id, 0);
+            return target;
+        }
+
+        double current = currentTerrainValue.getOrDefault(id, 0.0);
+        double previousTarget = terrainTransitionTarget.getOrDefault(id, current);
+        int remaining = terrainTransitionTicksRemaining.getOrDefault(id, 0);
+
+        if (Math.abs(target - previousTarget) > 1.0E-6) {
+            remaining = transitionTicks;
+            terrainTransitionTarget.put(id, target);
+        }
+
+        if (remaining > 0) {
+            current += (target - current) / remaining;
+            remaining--;
+        } else {
+            current = target;
+        }
+
+        currentTerrainValue.put(id, current);
+        terrainTransitionTicksRemaining.put(id, remaining);
+        return current;
     }
 
     private double bestMatchAtPos(LivingEntity entity, BlockPos pos) {
@@ -243,19 +299,33 @@ public class MovementModifierEvents {
         AttributeInstance attr = entity.getAttribute(Attributes.MOVEMENT_SPEED);
         if (attr == null) return;
 
-        attr.removeModifier(SPEED_MODIFIER_ID);
-
-        if (Math.abs(value) > 1.0E-6) {
-            attr.addTransientModifier(new AttributeModifier(
-                    SPEED_MODIFIER_ID,
-                    value,
-                    AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL
-            ));
+        AttributeModifier existing = attr.getModifier(SPEED_MODIFIER_ID);
+        if (Math.abs(value) <= 1.0E-6) {
+            if (existing != null) attr.removeModifier(SPEED_MODIFIER_ID);
+            return;
         }
+
+        if (existing != null && Math.abs(existing.amount() - value) <= 1.0E-6) return;
+
+        attr.addOrUpdateTransientModifier(new AttributeModifier(
+                SPEED_MODIFIER_ID,
+                value,
+                AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL
+        ));
     }
 
     private void removeModifier(LivingEntity entity) {
         AttributeInstance attr = entity.getAttribute(Attributes.MOVEMENT_SPEED);
         if (attr != null) attr.removeModifier(SPEED_MODIFIER_ID);
+    }
+
+    private void clearState(UUID id) {
+        lastTerrainValue.remove(id);
+        stickyTicksRemaining.remove(id);
+        lastPenaltySum.remove(id);
+        wasOnGround.remove(id);
+        currentTerrainValue.remove(id);
+        terrainTransitionTarget.remove(id);
+        terrainTransitionTicksRemaining.remove(id);
     }
 }

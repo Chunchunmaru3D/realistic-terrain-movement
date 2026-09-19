@@ -10,6 +10,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.neoforge.event.entity.EntityLeaveLevelEvent;
 import net.neoforged.neoforge.event.tick.EntityTickEvent;
 
 import java.util.HashMap;
@@ -29,6 +30,8 @@ import java.util.UUID;
  * climb terraces/cliffs without being shoved off mid-jump.
  */
 public class WindEvents {
+
+    private static final double WEATHER_STRENGTH_MULTIPLIER = 1.3;
 
     private Set<ResourceLocation> excludedTypeCache = null;
     private List<? extends String> lastExcludedSnapshot = null;
@@ -50,7 +53,11 @@ public class WindEvents {
         ResourceLocation typeId = BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType());
         if (typeId != null && excludedTypeCache.contains(typeId)) return;
 
-        if (isPlayer && ((Player) entity).getAbilities().flying) return;
+        if (isPlayer && ((Player) entity).getAbilities().flying && !RealisticTerrainMovementConfig.AFFECT_FLYING.get()) return;
+
+        // A rider and its mount must never both receive an impulse. By default, ridden mounts are sheltered too.
+        if (entity.isPassenger()) return;
+        if (entity.isVehicle() && !RealisticTerrainMovementConfig.WIND_AFFECTS_MOUNTED_ENTITIES.get()) return;
 
         // ── Jump exemption: track last-known ground Y, skip wind while ascending <3 blocks ──
         UUID id = entity.getUUID();
@@ -75,8 +82,12 @@ public class WindEvents {
 
         double progress = Math.min((y - startY) / Math.max(1.0, (maxY - startY)), 1.0);
         Vec3 windDir = computeWindDirection(level.getGameTime());
+        double weatherStrength = level.isRainingAt(pos) || level.isThundering()
+                ? WEATHER_STRENGTH_MULTIPLIER
+                : 1.0;
 
-        double pushStrength = progress * RealisticTerrainMovementConfig.WIND_MAX_PUSH.get();
+        double pushStrength = progress * RealisticTerrainMovementConfig.WIND_MAX_PUSH.get() * weatherStrength;
+        if (pushStrength <= 1.0E-6) return;
         Vec3 push = windDir.scale(pushStrength);
 
         Vec3 motion = entity.getDeltaMovement();
@@ -96,6 +107,11 @@ public class WindEvents {
 
         entity.setDeltaMovement(newMotion);
         entity.hurtMarked = true; // ensures velocity change is synced to clients (incl. the player itself)
+    }
+
+    @SubscribeEvent
+    public void onEntityLeaveLevel(EntityLeaveLevelEvent event) {
+        lastGroundY.remove(event.getEntity().getUUID());
     }
 
     /** Slowly rotating wind direction, deterministic from world time (no extra state needed). */

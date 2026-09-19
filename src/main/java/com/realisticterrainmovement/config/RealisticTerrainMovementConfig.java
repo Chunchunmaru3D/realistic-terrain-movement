@@ -25,7 +25,11 @@ public class RealisticTerrainMovementConfig {
     // ── Terrain / Block modifiers ─────────────────────────────────────────────
 
     public static final ModConfigSpec.ConfigValue<List<? extends String>> TERRAIN_MODIFIERS;
+    public static final ModConfigSpec.ConfigValue<String> TERRAIN_DIFFICULTY;
+    public static final ModConfigSpec.ConfigValue<Double> EASY_TERRAIN_PENALTY_MULTIPLIER;
+    public static final ModConfigSpec.ConfigValue<Double> HARDCORE_TERRAIN_PENALTY_MULTIPLIER;
     public static final ModConfigSpec.ConfigValue<Integer> TERRAIN_STICKY_TICKS;
+    public static final ModConfigSpec.ConfigValue<Integer> TERRAIN_TRANSITION_TICKS;
     public static final ModConfigSpec.ConfigValue<Boolean> JUMP_DISTANCE_LIMIT_ENABLED;
     public static final ModConfigSpec.ConfigValue<Double> JUMP_DISTANCE_LIMIT_FLOOR;
 
@@ -42,6 +46,9 @@ public class RealisticTerrainMovementConfig {
     public static final ModConfigSpec.ConfigValue<Double> WIND_SLOW_FACTOR;
     public static final ModConfigSpec.ConfigValue<Integer> WIND_DIRECTION_PERIOD_TICKS;
     public static final ModConfigSpec.ConfigValue<Double> WIND_JUMP_EXEMPTION_HEIGHT;
+    public static final ModConfigSpec.ConfigValue<Boolean> WIND_AFFECTS_MOUNTED_ENTITIES;
+    public static final ModConfigSpec.ConfigValue<Boolean> WIND_SOUND_ENABLED;
+    public static final ModConfigSpec.ConfigValue<Double> WIND_SOUND_MAX_VOLUME;
 
     // ── Boats ─────────────────────────────────────────────────────────────────
 
@@ -61,7 +68,7 @@ public class RealisticTerrainMovementConfig {
                 .comment("Master switch: block-based speed bonuses/penalties + boots reduction (default: true)")
                 .define("terrainEnabled", true);
         WIND_ENABLED = BUILDER
-                .comment("Master switch: high-altitude wind push/slowdown (default: true)")
+                .comment("Master switch: high-altitude wind push/slowdown (default: true). The wind sound has a separate switch below.")
                 .define("windEnabled", true);
         BOATS_ENABLED = BUILDER
                 .comment("Master switch: boats breaking in ocean biomes (default: true)")
@@ -107,8 +114,8 @@ public class RealisticTerrainMovementConfig {
                     "Both the block stood ON and the block stood IN are checked; values from both are summed.",
                     "Entries using tags/blocks from a mod that isn't installed are simply ignored — safe to leave in.",
                     "",
-                    "Vanilla tags/blocks plus popular biome-mod compatibility (Biomes O'Plenty, Regions Unexplored,",
-                    "Geophilic, Quark, Nature's Spirit).",
+                    "Vanilla tags/blocks plus popular biome/geology-mod compatibility (Biomes O'Plenty, Regions Unexplored,",
+                    "Quark, Nature's Spirit, Unearthed). Geophilic uses vanilla blocks and needs no separate entries.",
                     "Add more entries for other mods using the same '#modid:tag=value' or 'modid:block=value' syntax."
                 )
                 .defineListAllowEmpty("blockSpeedModifiers",
@@ -141,6 +148,7 @@ public class RealisticTerrainMovementConfig {
 
                                 // ── Vanilla penalties: dirt, soft/loose terrain ──
                                 "#minecraft:dirt=-0.05",
+                                "#minecraft:sand=-0.20",
                                 "minecraft:sand=-0.20",
                                 "minecraft:red_sand=-0.20",
                                 "minecraft:gravel=-0.10",
@@ -151,9 +159,38 @@ public class RealisticTerrainMovementConfig {
                                 "minecraft:muddy_mangrove_roots=-0.25",
                                 "minecraft:snow=-0.35",
                                 "#minecraft:ice=-0.10",
-
                                 // ── Biomes O'Plenty (modid: biomesoplenty) ──
-                                "#biomesoplenty:planks=0.20",
+                                // Its wood types are included in #minecraft:planks.
+                                // Current BOP sand variants are included in #minecraft:sand;
+                                // this common tag covers every sandstone block variant across BOP and vanilla.
+                                "#c:sandstone/blocks=0.20",
+                                "biomesoplenty:mossy_black_sand=-0.20",
+                                "biomesoplenty:black_sandstone_slab=0.20",
+                                "biomesoplenty:black_sandstone_stairs=0.20",
+                                "biomesoplenty:cut_black_sandstone_slab=0.20",
+                                "biomesoplenty:cut_black_sandstone_stairs=0.20",
+                                "biomesoplenty:smooth_black_sandstone_slab=0.20",
+                                "biomesoplenty:smooth_black_sandstone_stairs=0.20",
+                                "biomesoplenty:orange_sandstone_slab=0.20",
+                                "biomesoplenty:orange_sandstone_stairs=0.20",
+                                "biomesoplenty:cut_orange_sandstone_slab=0.20",
+                                "biomesoplenty:cut_orange_sandstone_stairs=0.20",
+                                "biomesoplenty:smooth_orange_sandstone_slab=0.20",
+                                "biomesoplenty:smooth_orange_sandstone_stairs=0.20",
+                                "biomesoplenty:white_sandstone_slab=0.20",
+                                "biomesoplenty:white_sandstone_stairs=0.20",
+                                "biomesoplenty:cut_white_sandstone_slab=0.20",
+                                "biomesoplenty:cut_white_sandstone_stairs=0.20",
+                                "biomesoplenty:smooth_white_sandstone_slab=0.20",
+                                "biomesoplenty:smooth_white_sandstone_stairs=0.20",
+                                "biomesoplenty:brimstone_bricks=0.20",
+                                "biomesoplenty:chiseled_brimstone_bricks=0.20",
+                                "biomesoplenty:brimstone_brick_slab=0.20",
+                                "biomesoplenty:brimstone_brick_stairs=0.20",
+                                "biomesoplenty:rose_quartz_block=0.20",
+                                "biomesoplenty:thermal_calcite=0.20",
+
+                                // Legacy BOP terrain IDs are retained for older compatible releases.
                                 "biomesoplenty:dried_mud=-0.15",
                                 "biomesoplenty:mud=-0.35",
                                 "biomesoplenty:soft_mud=-0.40",
@@ -166,6 +203,33 @@ public class RealisticTerrainMovementConfig {
                                 "biomesoplenty:origin_sand=-0.20",
 
                                 // ── Regions Unexplored (modid: regions_unexplored) ──
+                                // These tags cover all current silt, peat, and ash block variants.
+                                "#regions_unexplored:silt/all=-0.30",
+                                "regions_unexplored:silt_mud=-0.35",
+                                "#regions_unexplored:peat/all=-0.25",
+                                "regions_unexplored:peat_mud=-0.35",
+                                "#regions_unexplored:ash=-0.20",
+                                "regions_unexplored:ashen_dirt=-0.05",
+                                "regions_unexplored:sandy_grass=-0.20",
+
+                                // Current RU stone and constructed-stone surfaces.
+                                "regions_unexplored:argillite=0.20",
+                                "regions_unexplored:argillite_grass_block=0.20",
+                                "regions_unexplored:mossy_stone=0.20",
+                                "regions_unexplored:stone_grass_block=0.20",
+                                "regions_unexplored:chalk=0.20",
+                                "regions_unexplored:chalk_grass_block=0.20",
+                                "regions_unexplored:chalk_pillar=0.20",
+                                "regions_unexplored:chalk_slab=0.20",
+                                "regions_unexplored:chalk_stairs=0.20",
+                                "regions_unexplored:polished_chalk=0.20",
+                                "regions_unexplored:polished_chalk_slab=0.20",
+                                "regions_unexplored:polished_chalk_stairs=0.20",
+                                "regions_unexplored:chalk_bricks=0.20",
+                                "regions_unexplored:chalk_brick_slab=0.20",
+                                "regions_unexplored:chalk_brick_stairs=0.20",
+
+                                // Legacy RU terrain IDs are retained for older compatible releases.
                                 "regions_unexplored:silt=-0.30",
                                 "regions_unexplored:red_quicksand=-0.40",
                                 "regions_unexplored:quicksand=-0.40",
@@ -175,7 +239,6 @@ public class RealisticTerrainMovementConfig {
                                 "regions_unexplored:cracked_mud=-0.20",
                                 "regions_unexplored:peat=-0.25",
                                 "regions_unexplored:caustic_sand=-0.20",
-                                "#regions_unexplored:planks=0.20",
 
                                 // ── Quark (modid: quark) ──
                                 "#quark:planks=0.20",
@@ -183,38 +246,91 @@ public class RealisticTerrainMovementConfig {
                                 "quark:framed_path=0.20",
 
                                 // ── Nature's Spirit (modid: natures_spirit) ──
-                                // Most new planks already join the vanilla #minecraft:planks tag,
-                                // but listed explicitly here too as a safe redundant fallback.
-                                "#natures_spirit:planks=0.20",
-                                "natures_spirit:wisteria_planks=0.20",
-                                "natures_spirit:aspen_planks=0.20",
-                                "natures_spirit:maple_planks=0.20",
-                                "natures_spirit:redwood_planks=0.20",
-                                "natures_spirit:joshua_planks=0.20",
-                                "natures_spirit:cedar_planks=0.20",
-                                "natures_spirit:mahogany_planks=0.20",
-                                "natures_spirit:olive_planks=0.20",
-                                "natures_spirit:saxaul_planks=0.20",
-                                "natures_spirit:willow_planks=0.20",
-                                "natures_spirit:ghaf_planks=0.20",
-                                "natures_spirit:larch_planks=0.20",
-                                "natures_spirit:alluaudia_planks=0.20",
-                                "natures_spirit:kaolin=0.20",
-                                "natures_spirit:kaolin_bricks=0.20",
-                                "natures_spirit:chalk=0.20",
+                                // Current Nature's Spirit puts its wood and pink sand in vanilla tags above.
+                                // Its material-specific tags cover every dyed chalk and kaolin variant.
+                                "#natures_spirit:chalk=0.20",
+                                "#natures_spirit:chalk_slabs=0.20",
+                                "#natures_spirit:chalk_stairs=0.20",
+                                "#natures_spirit:kaolin=0.20",
+                                "#natures_spirit:kaolin_slabs=0.20",
+                                "#natures_spirit:kaolin_stairs=0.20",
+                                "#natures_spirit:kaolin_bricks=0.20",
+                                "#natures_spirit:kaolin_brick_slabs=0.20",
+                                "#natures_spirit:kaolin_brick_stairs=0.20",
                                 "natures_spirit:chert=0.20",
+                                "natures_spirit:chert_slab=0.20",
+                                "natures_spirit:chert_stairs=0.20",
+                                "natures_spirit:polished_chert=0.20",
+                                "natures_spirit:polished_chert_slab=0.20",
+                                "natures_spirit:polished_chert_stairs=0.20",
+                                "natures_spirit:chert_tiles=0.20",
+                                "natures_spirit:chert_tile_slab=0.20",
+                                "natures_spirit:chert_tile_stairs=0.20",
+                                "natures_spirit:chert_bricks=0.20",
+                                "natures_spirit:chert_brick_slab=0.20",
+                                "natures_spirit:chert_brick_stairs=0.20",
+                                "natures_spirit:chiseled_chert=0.20",
                                 "natures_spirit:travertine=0.20",
-                                "natures_spirit:pink_sandstone=0.20"
+                                "natures_spirit:travertine_slab=0.20",
+                                "natures_spirit:travertine_stairs=0.20",
+                                "natures_spirit:polished_travertine=0.20",
+                                "natures_spirit:polished_travertine_slab=0.20",
+                                "natures_spirit:polished_travertine_stairs=0.20",
+                                "natures_spirit:travertine_tiles=0.20",
+                                "natures_spirit:travertine_tile_slab=0.20",
+                                "natures_spirit:travertine_tile_stairs=0.20",
+                                "natures_spirit:travertine_bricks=0.20",
+                                "natures_spirit:travertine_brick_slab=0.20",
+                                "natures_spirit:travertine_brick_stairs=0.20",
+                                "natures_spirit:cobbled_travertine=0.20",
+                                "natures_spirit:cobbled_travertine_slab=0.20",
+                                "natures_spirit:cobbled_travertine_stairs=0.20",
+                                "natures_spirit:mossy_cobbled_travertine=0.20",
+                                "natures_spirit:mossy_cobbled_travertine_slab=0.20",
+                                "natures_spirit:mossy_cobbled_travertine_stairs=0.20",
+                                "natures_spirit:mossy_travertine_bricks=0.20",
+                                "natures_spirit:mossy_travertine_brick_slab=0.20",
+                                "natures_spirit:mossy_travertine_brick_stairs=0.20",
+                                "natures_spirit:chiseled_travertine=0.20",
+                                "natures_spirit:pink_sandstone=0.20",
+                                "natures_spirit:pink_sandstone_slab=0.20",
+                                "natures_spirit:pink_sandstone_stairs=0.20",
+                                "natures_spirit:cut_pink_sandstone=0.20",
+                                "natures_spirit:cut_pink_sandstone_slab=0.20",
+                                "natures_spirit:smooth_pink_sandstone=0.20",
+                                "natures_spirit:smooth_pink_sandstone_slab=0.20",
+                                "natures_spirit:smooth_pink_sandstone_stairs=0.20",
+                                "natures_spirit:chiseled_pink_sandstone=0.20",
+
+                                // ── Unearthed (Unofficial Port, modid: unearthed) ──
+                                // The port publishes all natural rock strata through the common stone tags.
+                                "#c:stones=0.20",
+                                "#c:cobblestones=0.20",
+                                // Regolith is also part of #minecraft:dirt above; this explicit tag keeps the
+                                // intended terrain classification visible and works if the mod changes that tag.
+                                "#unearthed:regolith=-0.05"
                         ),
                         entry -> entry instanceof String s && s.contains("=")
                 );
+        TERRAIN_DIFFICULTY = BUILDER
+                .comment("Terrain difficulty preset: EASY, NORMAL, HARDCORE. It only scales penalties; blockSpeedModifiers remain fully editable.")
+                .define("difficulty", "NORMAL", entry -> entry instanceof String s && TerrainDifficulty.isValid(s));
+        EASY_TERRAIN_PENALTY_MULTIPLIER = BUILDER
+                .comment("Penalty multiplier used by the EASY terrain difficulty preset (default: 0.5).")
+                .defineInRange("easyPenaltyMultiplier", 0.5, 0.0, 1.0);
+        HARDCORE_TERRAIN_PENALTY_MULTIPLIER = BUILDER
+                .comment("Penalty multiplier used by the HARDCORE terrain difficulty preset (default: 1.35).")
+                .defineInRange("hardcorePenaltyMultiplier", 1.35, 1.0, 3.0);
         TERRAIN_STICKY_TICKS = BUILDER
                 .comment(
                     "How many ticks (20 = 1 second) a terrain speed modifier is held after leaving the ground.",
                     "Prevents jump-spamming across slow terrain (sand, mud, etc.) to bypass the penalty.",
-                    "Default: 40 (2 seconds)"
+                    "Default: 8 (0.4 seconds). Horizontal jump carry is limited separately."
                 )
-                .defineInRange("terrainStickyTicks", 40, 0, 1200);
+                .defineInRange("terrainStickyTicks", 8, 0, 1200);
+        TERRAIN_TRANSITION_TICKS = BUILDER
+                .comment("Ticks used to smoothly transition to a changed terrain speed modifier (default: 6). Set to 0 for instant changes.")
+                .defineInRange("terrainTransitionTicks", 6, 0, 200);
         JUMP_DISTANCE_LIMIT_ENABLED = BUILDER
                 .comment(
                     "Whether jumping on a slowing (penalty) block dampens horizontal jump distance.",
@@ -243,7 +359,7 @@ public class RealisticTerrainMovementConfig {
                 .comment("Y-level where wind reaches full strength (default: 250)")
                 .defineInRange("windMaxY", 250, -64, 320);
         WIND_MAX_PUSH = BUILDER
-                .comment("Maximum sideways push per tick in blocks at full wind strength (default: 0.03)")
+                .comment("Maximum sideways push per tick in blocks at full wind strength. Vanilla rain and thunderstorms increase it by 30% (default: 0.03)")
                 .defineInRange("windMaxPush", 0.03, 0.0, 1.0);
         WIND_SLOW_FACTOR = BUILDER
                 .comment("How much walking directly against the wind is slowed at full strength (default: 0.2 = up to -20%)")
@@ -254,6 +370,15 @@ public class RealisticTerrainMovementConfig {
         WIND_JUMP_EXEMPTION_HEIGHT = BUILDER
                 .comment("Wind is ignored while ascending less than this many blocks above last ground position (default: 3.0)")
                 .defineInRange("windJumpExemptionHeight", 3.0, 0.0, 10.0);
+        WIND_AFFECTS_MOUNTED_ENTITIES = BUILDER
+                .comment("Whether wind affects a ridden mount. Riders are never pushed separately, preventing double impulses (default: false).")
+                .define("affectsMountedEntities", false);
+        WIND_SOUND_ENABLED = BUILDER
+                .comment("Play a procedural high-altitude wind sound for the local player independently of wind push/slowdown (default: true).")
+                .define("windSoundEnabled", true);
+        WIND_SOUND_MAX_VOLUME = BUILDER
+                .comment("Maximum volume of the high-altitude wind sound (default: 0.45).")
+                .defineInRange("windSoundMaxVolume", 0.45, 0.0, 1.0);
         BUILDER.pop();
 
         BUILDER.push("boats");
